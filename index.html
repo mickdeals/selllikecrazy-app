@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- App identity -->
+    <title>Sell Like Crazy — Everything sells here</title>
+    <meta name="description" content="Buy and sell anything on Australia's smartest marketplace. AI-powered listings, zero commission, verified sellers." />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+
+    <!-- PWA -->
+    <meta name="theme-color" content="#FF2D55" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Sell Like Crazy" />
+
+    <!-- Apple App Store smart banner
+         Replace YOUR_APP_ID with your App Store ID once live
+         Format: app-id=123456789 -->
+    <!-- <meta name="apple-itunes-app" content="app-id=YOUR_APP_ID, app-argument=https://selllikecrazy.app"> -->
+
+    <!-- Google Play smart banner (via Google Play badge on landing)
+         Android Chrome shows "Add to Home Screen" prompt automatically for PWAs -->
+
+    <!-- Open Graph — controls how links look when shared on Facebook, WhatsApp etc -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:site_name"   content="Sell Like Crazy" />
+    <meta property="og:title"       content="Sell Like Crazy — Everything sells here" />
+    <meta property="og:description" content="Buy and sell anything. AI listings, zero commission, verified sellers." />
+    <meta property="og:image"       content="https://selllikecrazy.app/logo.png" />
+    <meta property="og:url"         content="https://selllikecrazy.app" />
+
+    <!-- Twitter/X card — controls how links look on Twitter -->
+    <meta name="twitter:card"        content="summary" />
+    <meta name="twitter:title"       content="Sell Like Crazy" />
+    <meta name="twitter:description" content="Buy and sell anything. AI listings, zero commission." />
+    <meta name="twitter:image"       content="https://selllikecrazy.app/logo.png" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+  </head>
+  <body>
+   <div id="root"></div>
+    <!-- Kill old service workers -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          regs.forEach(reg => reg.unregister())
+        })
+        caches.keys().then(keys => keys.forEach(k => caches.delete(k)))
+      }
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Capture PWA install prompt for use in SmartBanner -->
+    <script>
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault()
+        window._pwaInstallPrompt = e
+      })
+    </script>
+  </body>
+</html>

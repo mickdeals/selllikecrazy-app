@@ -1,0 +1,29 @@
+{
+  "name": "Sell Like Crazy",
+  "short_name": "Sell Like Crazy",
+  "description": "Buy and sell anything. Everything sells here.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#FF2D55",
+  "background_color": "#F5F5F7",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["shopping", "lifestyle"],
+  "lang": "en-AU",
+  "dir": "ltr",
+  "scope": "/",
+  "prefer_related_applications": false
+}
