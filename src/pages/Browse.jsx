@@ -44,7 +44,7 @@ export default function Browse() {
   const fetchCategories = async () => {
     const { data } = await supabase
       .from('listings').select('category').eq('status', 'active')
-      .eq('type', listingType === 'services' ? 'service' : 'item')
+      .eq('listing_type', listingType === 'services' ? 'service' : 'item')
     if (data) {
       const unique = [...new Set(data.map(r => r.category).filter(Boolean))].sort()
       setCategories(unique)
@@ -55,8 +55,8 @@ export default function Browse() {
     setLoading(true)
     try {
       let query = supabase.from('listings').select('*').eq('status', 'active')
-      if (listingType === 'items') query = query.eq('type', 'item')
-      if (listingType === 'services') query = query.eq('type', 'service')
+      if (listingType === 'items') query = query.eq('listing_type', 'item')
+      if (listingType === 'services') query = query.eq('listing_type', 'service')
       if (catFilter) query = query.eq('category', catFilter)
       if (priceFilter) query = query.lte('price', Number(priceFilter))
       if (sortBy === 'price_asc') query = query.order('price', { ascending: true })
@@ -133,8 +133,8 @@ export default function Browse() {
               style={{ background: 'var(--surface)', borderRadius: 12, overflow: 'hidden',
                 cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
               <div style={{ aspectRatio: '1', background: 'var(--bg)', overflow: 'hidden' }}>
-                {item.photos?.[0] ? (
-                  <img src={item.photos[0]} alt={item.title}
+                {item.photo_urls?.[0] ? (
+                  <img src={item.photo_urls[0]} alt={item.title}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   <div style={{ width: '100%', height: '100%', display: 'flex',
@@ -152,7 +152,7 @@ export default function Browse() {
                     </>
                   ) : (
                     <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--red)' }}>
-                      {item.type === 'service' ? `From $${item.price}` : `$${item.price}`}
+                      {item.listing_type === 'service' ? `From $${item.price}` : `$${item.price}`}
                     </span>
                   )}
                 </div>
