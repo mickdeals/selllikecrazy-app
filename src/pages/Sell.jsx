@@ -114,7 +114,7 @@ export default function Sell() {
     // Don't overwrite title — seller already typed it
     if (!form.title && aiResult.title) update('title', aiResult.title)
     update('description', aiResult.description)
-    update('category', aiResult.category)
+    if (!form.category) update('category', aiResult.category)
     update('price', String(aiResult.suggestedPrice))
     update('condition', aiResult.condition)
     if (aiResult.category) addCategory(aiResult.category)
