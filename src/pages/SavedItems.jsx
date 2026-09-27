@@ -1,31 +1,83 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, MapPin, Trash2, Bell, Search } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
+import { supabase } from '../lib/supabase'
 import { formatPrice } from '../lib/geo'
 import toast from 'react-hot-toast'
-
-const DEMO_SAVED = [
-  { id: 1,  title: 'iPhone 14 Pro 256GB',      price: 850,  category: 'Electronics', location: 'Perth, WA',      emoji: '📱', thumb: 1, savedAt: '2 hours ago',   shipping: 'free_shipping' },
-  { id: 3,  title: 'PS5 + 3 games bundle',     price: 620,  category: 'Gaming',      location: 'Sydney, NSW',    emoji: '🎮', thumb: 3, savedAt: '1 day ago',     shipping: 'free_shipping', badge: 'bundle' },
-  { id: 9,  title: 'Apple Watch Series 8',     price: 420,  category: 'Electronics', location: 'Melbourne, VIC', emoji: '⌚', thumb: 5, savedAt: '2 days ago',    shipping: 'free_shipping' },
-  { id: 5,  title: 'Canon EOS R50 + lens',     price: 1100, category: 'Electronics', location: 'Adelaide, SA',   emoji: '📷', thumb: 5, savedAt: '3 days ago',    shipping: 'buyer_pays' },
-  { id: 101, title: 'Scalp Micropigmentation', price: 800,  category: 'SMP',          location: 'Ballajura, WA',  emoji: '💆', thumb: 1, savedAt: '5 days ago',    type: 'service' },
-]
 
 export default function SavedItems() {
   const navigate = useNavigate()
   const { user, geo } = useAppStore()
   const symbol = geo?.symbol || '$'
-  const [saved, setSaved] = useState(DEMO_SAVED)
+  const [saved, setSaved] = useState([])
   const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) { setLoading(false); return }
+    const fetchSaved = async () => {
+      setLoading(true)
+      // Try saved_items first, fall back to wishlists
+      let { data, error } = await supabase
+        .from('saved_items')
+        .select('id, created_at, price_alert, listings(id, title, price, category, location, photo_urls, listing_type, shipping_type)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        // Try wishlists table
+        const result = await supabase
+          .from('wishlists')
+          .select('id, created_at, price_alert, listings(id, title, price, category, location, photo_urls, listing_type, shipping_type)')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+        data = result.data
+        error = result.error
+      }
+
+      if (!error && data) {
+        setSaved(data.map(row => {
+          const l = row.listings || {}
+          const savedAt = row.created_at
+            ? new Date(row.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+            : ''
+          return {
+            savedItemId: row.id,
+            id: l.id,
+            title: l.title,
+            price: l.price,
+            category: l.category,
+            location: l.location,
+            photo_urls: l.photo_urls,
+            listing_type: l.listing_type,
+            shipping: l.shipping_type,
+            savedAt,
+            priceAlert: row.price_alert || false,
+          }
+        }))
+      }
+      setLoading(false)
+    }
+    fetchSaved()
+  }, [user])
 
   const filtered = saved.filter(l =>
-    !search || l.title.toLowerCase().includes(search.toLowerCase()) || l.category.toLowerCase().includes(search.toLowerCase())
+    !search || (l.title || '').toLowerCase().includes(search.toLowerCase()) || (l.category || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  const remove = (id) => {
-    setSaved(s => s.filter(l => l.id !== id))
+  const remove = async (savedItemId, listingId) => {
+    // Optimistic update
+    setSaved(s => s.filter(l => l.savedItemId !== savedItemId))
+    const { error } = await supabase
+      .from('saved_items')
+      .delete()
+      .eq('id', savedItemId)
+      .eq('user_id', user.id)
+    if (error) {
+      // Try wishlists
+      await supabase.from('wishlists').delete().eq('id', savedItemId).eq('user_id', user.id)
+    }
     toast('Removed from saved', { icon: '💔' })
   }
 
@@ -61,7 +113,11 @@ export default function SavedItems() {
         </div>
       </div>
 
-      {filtered.length === 0 && saved.length === 0 ? (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
+          <p>Loading saved items...</p>
+        </div>
+      ) : filtered.length === 0 && saved.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px' }}>
           <div style={{ fontSize: 56, marginBottom: 16 }}>❤️</div>
           <h3 style={{ marginBottom: 8 }}>No saved items yet</h3>
@@ -77,13 +133,14 @@ export default function SavedItems() {
       ) : (
         <div style={{ padding: '8px 14px' }}>
           {filtered.map(l => (
-            <div key={l.id} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 16, padding: 14, marginBottom: 10, display: 'flex', gap: 12, alignItems: 'flex-start' }}
+            <div key={l.savedItemId} style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 16, padding: 14, marginBottom: 10, display: 'flex', gap: 12, alignItems: 'flex-start' }}
               onClick={() => navigate(`/listing/${l.id}`)}>
 
               {/* Thumb */}
-              <div className={`listing-thumb thumb-${l.thumb}`}
-                style={{ width: 72, height: 72, borderRadius: 14, fontSize: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                {l.emoji}
+              <div style={{ width: 72, height: 72, borderRadius: 14, fontSize: 30, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: 'var(--bg)', overflow: 'hidden' }}>
+                {l.photo_urls?.[0]
+                  ? <img src={l.photo_urls[0]} alt={l.title} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 14 }} />
+                  : '📦'}
               </div>
 
               {/* Info */}
@@ -93,24 +150,24 @@ export default function SavedItems() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--muted)', flexWrap: 'wrap' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><MapPin size={10} /> {l.location}</span>
                   {l.shipping === 'free_shipping' && <span style={{ color: 'var(--green)', fontWeight: 700 }}>Free shipping</span>}
-                  {l.type === 'service' && <span style={{ background: '#F0F0FF', color: '#635BFF', fontWeight: 700, padding: '1px 7px', borderRadius: 20, fontSize: 10 }}>Service</span>}
+                  {l.listing_type === 'service' && <span style={{ background: '#F0F0FF', color: '#635BFF', fontWeight: 700, padding: '1px 7px', borderRadius: 20, fontSize: 10 }}>Service</span>}
                   <span>· Saved {l.savedAt}</span>
                 </div>
               </div>
 
               {/* Actions */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                <button onClick={(e) => {
+                <button onClick={async (e) => {
                   e.stopPropagation()
-                  // Toggle price drop alert
                   const isOn = l.priceAlert
-                  setSaved(s => s.map(x => x.id === l.id ? { ...x, priceAlert: !isOn } : x))
+                  setSaved(s => s.map(x => x.savedItemId === l.savedItemId ? { ...x, priceAlert: !isOn } : x))
+                  await supabase.from('saved_items').update({ price_alert: !isOn }).eq('id', l.savedItemId)
                   toast(isOn ? 'Price alert removed' : '🔔 You\'ll be notified if the price drops!', { duration: 2500 })
                 }}
                   style={{ width: 34, height: 34, borderRadius: 10, background: l.priceAlert ? '#FFF0F3' : 'var(--bg)', border: `1px solid ${l.priceAlert ? 'var(--red)' : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: l.priceAlert ? 'var(--red)' : 'var(--muted)' }}>
                   <Bell size={14} fill={l.priceAlert ? 'var(--red)' : 'none'} />
                 </button>
-                <button onClick={() => remove(l.id)}
+                <button onClick={() => remove(l.savedItemId, l.id)}
                   style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--bg)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--muted)' }}>
                   <Trash2 size={14} />
                 </button>

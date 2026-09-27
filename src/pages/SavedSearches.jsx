@@ -1,15 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Search, Bell, BellOff, Trash2, Plus, SlidersHorizontal } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
+import { supabase } from '../lib/supabase'
 import { saveSearch, deleteSavedSearch, toggleSearchNotifications } from '../lib/savedSearches'
 import toast from 'react-hot-toast'
-
-const DEMO_SEARCHES = [
-  { id: 1, query: 'vintage camera', filters: '{"maxPrice":500}', notifications_enabled: true, match_count: 3, created_at: '2026-07-28' },
-  { id: 2, query: 'macbook pro', filters: '{"maxPrice":1500,"location":"Perth"}', notifications_enabled: true, match_count: 7, created_at: '2026-07-25' },
-  { id: 3, query: 'surfboard', filters: '{}', notifications_enabled: false, match_count: 1, created_at: '2026-07-20' },
-]
 
 const PRICE_OPTIONS = [null, 10, 20, 50, 100, 200, 500, 1000, 2000]
 
@@ -17,13 +12,31 @@ export default function SavedSearches() {
   const navigate = useNavigate()
   const { user, categories } = useAppStore()
 
-  const [searches, setSearches] = useState(DEMO_SEARCHES)
+  const [searches, setSearches] = useState([])
+  const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
   const [newQuery, setNewQuery] = useState('')
   const [maxPrice, setMaxPrice] = useState(null)
   const [category, setCategory] = useState('')
   const [location, setLocation] = useState('')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!user) { setLoading(false); return }
+    const fetchSearches = async () => {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('saved_searches')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+      if (!error && data) {
+        setSearches(data)
+      }
+      setLoading(false)
+    }
+    fetchSearches()
+  }, [user])
 
   const handleSave = async () => {
     if (!newQuery.trim()) { toast.error('Enter a search term'); return }
@@ -36,15 +49,29 @@ export default function SavedSearches() {
 
       await saveSearch(user?.id || 'demo', newQuery, filters)
 
-      const newSearch = {
-        id: Date.now(),
-        query: newQuery,
-        filters: JSON.stringify(filters),
-        notifications_enabled: true,
-        match_count: 0,
-        created_at: new Date().toISOString().split('T')[0],
+      // Re-fetch to get the real DB row with id
+      const { data } = await supabase
+        .from('saved_searches')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (data) {
+        setSearches(s => [data, ...s])
+      } else {
+        // Fallback optimistic row
+        setSearches(s => [{
+          id: Date.now(),
+          query: newQuery,
+          filters: JSON.stringify(filters),
+          notifications_enabled: true,
+          match_count: 0,
+          created_at: new Date().toISOString().split('T')[0],
+        }, ...s])
       }
-      setSearches(s => [newSearch, ...s])
+
       setNewQuery('')
       setMaxPrice(null)
       setCategory('')
@@ -155,7 +182,11 @@ export default function SavedSearches() {
       )}
 
       {/* Saved searches list */}
-      {searches.length === 0 ? (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)' }}>
+          <p>Loading saved searches...</p>
+        </div>
+      ) : searches.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--muted)' }}>
           <Search size={44} style={{ margin: '0 auto 14px', opacity: 0.3 }} />
           <h3 style={{ marginBottom: 8 }}>No saved searches yet</h3>

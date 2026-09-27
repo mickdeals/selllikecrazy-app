@@ -1,29 +1,43 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Zap, Plus, X, Tag, Lock } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
+import { supabase } from '../lib/supabase'
 import { formatPrice } from '../lib/geo'
 import toast from 'react-hot-toast'
 
-const MY_LISTINGS = [
-  { id: 1, title: 'iPhone 14 Pro', price: 850, emoji: '📱', thumb: 1 },
-  { id: 2, title: 'PS5 bundle',    price: 620, emoji: '🎮', thumb: 3 },
-  { id: 3, title: 'Nike Air Max',  price: 95,  emoji: '👟', thumb: 2 },
-  { id: 4, title: 'Canon EOS R50', price: 1100,emoji: '📷', thumb: 5 },
-]
-
 export default function BundleCreator() {
   const navigate = useNavigate()
-  const { plan, geo } = useAppStore()
+  const { user, plan, geo } = useAppStore()
   const symbol = geo?.symbol || '$'
   const isPowerSeller = plan === 'annual'
 
+  const [myListings, setMyListings] = useState([])
+  const [loadingListings, setLoadingListings] = useState(true)
   const [selected, setSelected] = useState([])
   const [bundlePrice, setBundlePrice] = useState('')
   const [bundleName, setBundleName] = useState('')
 
+  useEffect(() => {
+    if (!user || !isPowerSeller) { setLoadingListings(false); return }
+    const fetchListings = async () => {
+      setLoadingListings(true)
+      const { data, error } = await supabase
+        .from('listings')
+        .select('id, title, price, photo_urls, category')
+        .eq('seller_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+      if (!error && data) {
+        setMyListings(data)
+      }
+      setLoadingListings(false)
+    }
+    fetchListings()
+  }, [user, isPowerSeller])
+
   const totalOriginal = selected.reduce((s, id) => {
-    const l = MY_LISTINGS.find(x => x.id === id)
+    const l = myListings.find(x => x.id === id)
     return s + (l?.price || 0)
   }, 0)
 
@@ -105,13 +119,24 @@ export default function BundleCreator() {
         <div className="section-label" style={{ padding: 0, marginBottom: 12 }}>
           Select listings to bundle (2–5)
         </div>
-        {MY_LISTINGS.map(l => {
+
+        {loadingListings ? (
+          <p style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>Loading your listings...</p>
+        ) : myListings.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)' }}>
+            <p style={{ fontSize: 13, marginBottom: 12 }}>You have no active listings to bundle.</p>
+            <button className="btn-secondary" onClick={() => navigate('/create-listing')}>Create a listing</button>
+          </div>
+        ) : myListings.map(l => {
           const isSelected = selected.includes(l.id)
+          const thumb = l.photo_urls?.[0]
           return (
             <div key={l.id} onClick={() => toggleListing(l.id)}
               style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: isSelected ? '#FFF0F3' : 'white', border: `1.5px solid ${isSelected ? 'var(--red)' : 'var(--border)'}`, borderRadius: 14, marginBottom: 8, cursor: 'pointer', transition: 'all 0.15s' }}>
-              <div className={`listing-thumb thumb-${l.thumb}`} style={{ width: 42, height: 42, borderRadius: 10, fontSize: 20, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {l.emoji}
+              <div style={{ width: 42, height: 42, borderRadius: 10, fontSize: 20, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', overflow: 'hidden' }}>
+                {thumb
+                  ? <img src={thumb} alt={l.title} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10 }} />
+                  : '📦'}
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{l.title}</div>
