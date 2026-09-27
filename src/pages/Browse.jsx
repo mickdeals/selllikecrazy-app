@@ -37,8 +37,8 @@ export default function Browse() {
         .select('*')
         .eq('status', 'active')
 
-      if (listingType === 'items') query = query.eq('type', 'item')
-      if (listingType === 'services') query = query.eq('type', 'service')
+    // if (listingType === 'items') query = query.eq('type', 'item')
+// if (listingType === 'services') query = query.eq('type', 'service')
 
       if (catFilter) query = query.eq('category', catFilter)
       if (priceFilter) query = query.lte('price', priceFilter)
